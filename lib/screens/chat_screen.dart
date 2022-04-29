@@ -46,6 +46,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final User? user = authResult.user;
 
+      Map <String, dynamic> usuario = {
+        'nome' : user!.displayName,
+        'email' : user.email,
+        'foto' : user.photoURL,
+        'uid' : user.uid,
+      };
+
+      FirebaseFirestore.instance.collection('usuarios').doc(user.uid).set(usuario);
       return user;
     } catch (error) {
       print("deu ruim doidão $error");
@@ -154,7 +162,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       );
                     } catch (error) {
-                      print("deu mais ruim ainda doidão $error");
                     }
                     return Center(
                       child: AlertDialog(
