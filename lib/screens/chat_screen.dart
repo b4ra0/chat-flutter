@@ -23,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     FirebaseAuth.instance.authStateChanges().listen((user) {
       _currentUser = user;
+      setState(() {});
     });
   }
 
@@ -44,23 +45,16 @@ class _ChatScreenState extends State<ChatScreen> {
           await FirebaseAuth.instance.signInWithCredential(credential);
 
       final User? user = authResult.user;
+
       return user;
     } catch (error) {
-      print(error);
+      print("deu ruim doidão $error");
       return null;
     }
   }
 
   void _sendMessage({String? text, File? imgFile}) async {
     final User? user = await _getUser();
-
-    if (user == null) {
-      _scaffoldKey.currentState!.showSnackBar(
-        SnackBar(
-          content: Text("Não foi possível fazer login"),
-        ),
-      );
-    }
 
     Map<String, dynamic> data = {
       'uid': user!.uid,
@@ -73,7 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (imgFile != null) {
       TaskSnapshot task = await FirebaseStorage.instance
           .ref()
-          .child(DateTime.now().millisecondsSinceEpoch.toString())
+          .child(user.uid + DateTime.now().millisecondsSinceEpoch.toString())
           .putFile(imgFile);
       String url = await task.ref.getDownloadURL();
       data['imageUrl'] = url;
@@ -84,26 +78,57 @@ class _ChatScreenState extends State<ChatScreen> {
     FirebaseFirestore.instance.collection('messages').add(data);
   }
 
-  void _fetchMessages() async {
-    DocumentSnapshot menssagens =
-        await FirebaseFirestore.instance.collection('messages').doc().get();
-    print(menssagens.toString());
-  }
-
   @override
   Widget build(BuildContext context) {
-    _fetchMessages();
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: Text("Chat"),
+        title: Text(
+          _currentUser != null ? 'Olá, ${_currentUser!.displayName}' : 'Chat',
+        ),
+        actions: [
+          _currentUser == null
+              ? IconButton(
+                  onPressed: () {
+                    _getUser();
+                  },
+                  icon: Icon(Icons.login))
+              : IconButton(
+                  onPressed: () {
+                    showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                              title: Text("Sair"),
+                              content: Text("Você deseja mesmo sair?"),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                  child: Text("Não"),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    FirebaseAuth.instance.signOut();
+                                    googleSignIn.signOut();
+                                    Navigator.pop(context);
+                                  },
+                                  child: Text("Sair"),
+                                ),
+                              ],
+                            ));
+                  },
+                  icon: Icon(Icons.logout)),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream:
-                  FirebaseFirestore.instance.collection('messages').orderBy('hour').snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('messages')
+                  .orderBy('hour')
+                  .snapshots(),
               builder: (context, snapshot) {
                 switch (snapshot.connectionState) {
                   case ConnectionState.waiting:
@@ -111,22 +136,40 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: CircularProgressIndicator(),
                     );
                   default:
-                    List<DocumentSnapshot> documents = snapshot.data!.docs.reversed.toList();
-                    return ListView.builder(
-                      reverse: true,
-                      itemCount: documents.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                          child: ChatMessage(documents[index].data() as Map<String, dynamic>, true),
-                        );
-                      },
+                    try {
+                      List<DocumentSnapshot> documents =
+                          snapshot.data!.docs.reversed.toList();
+                      return ListView.builder(
+                        physics: BouncingScrollPhysics(),
+                        reverse: true,
+                        itemCount: documents.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 2),
+                            child: ChatMessage(
+                                documents[index].data() as Map<String, dynamic>,
+                                _currentUser == null ? '' : _currentUser!.uid),
+                          );
+                        },
+                      );
+                    } catch (error) {
+                      print("deu mais ruim ainda doidão $error");
+                    }
+                    return Center(
+                      child: AlertDialog(
+                        content: Text(
+                            "Você precisa estar logado para visualizar o chat"),
+                        actions: [
+                          TextButton(onPressed: _getUser, child: Text("Logar"))
+                        ],
+                      ),
                     );
                 }
               },
             ),
           ),
-          TextComposer(_sendMessage),
+          _currentUser != null ? TextComposer(_sendMessage) : Container(),
         ],
       ),
     );

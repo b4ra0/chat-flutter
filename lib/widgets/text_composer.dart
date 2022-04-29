@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 class TextComposer extends StatefulWidget {
@@ -44,6 +45,7 @@ class _TextComposerState extends State<TextComposer> {
           ),
           Expanded(
             child: TextField(
+              textCapitalization: TextCapitalization.sentences,
               controller: _messageController,
               decoration:
                   InputDecoration.collapsed(hintText: "Enviar uma mensagem"),
