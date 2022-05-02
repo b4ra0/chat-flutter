@@ -1,3 +1,5 @@
+import 'package:chat/screens/chat_screen.dart';
+import 'package:chat/screens/image_screen.dart';
 import 'package:flutter/material.dart';
 
 class CardContato extends StatelessWidget {
@@ -7,12 +9,33 @@ class CardContato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundImage: NetworkImage(data['foto']),
-        radius: 20,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
+      child: ListTile(
+        leading: GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              DialogRoute(
+                builder: (context) => ImageScreen(data['foto'], data['nome']),
+                context: context,
+              ),
+            );
+          },
+          child: CircleAvatar(
+            foregroundImage: NetworkImage(data['foto']),
+            radius: 25,
+          ),
+        ),
+        title: Text(data['nome']),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(data),
+            ),
+          );
+        },
       ),
-      title: Text(data['nome']),
     );
   }
 }

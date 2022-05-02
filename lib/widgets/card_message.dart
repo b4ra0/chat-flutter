@@ -4,44 +4,51 @@ import 'package:intl/intl.dart';
 
 class ChatMessage extends StatelessWidget {
 
-  final String usuario;
-  final Map<String, dynamic> dados;
+  final String usuarioUid;
+  final Map<String, dynamic> dadosMensagem;
+  final Map<String, dynamic> contato;
 
-  ChatMessage(this.dados, this.usuario);
+  ChatMessage(this.dadosMensagem, this.usuarioUid, this.contato);
 
 
   @override
   Widget build(BuildContext context) {
-    final bool mine = dados['uid'] == usuario;
-    return Row(
-      children: [
-        !mine ?
-        CircleAvatar(
-          foregroundImage: NetworkImage(dados['senderPhoto'], scale: 1),
-        ) : Container(),
-        SizedBox(width: 10),
-        Expanded(
-          child: Card(
-            // shape: ShapeBorder(),
-            child: Padding(
-              padding: const EdgeInsets.all(2.0),
-              child: ListTile(
-                title: dados['imageUrl'] != null ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Image.network(dados['imageUrl']),
-                ) : Text(dados['text']),
-                subtitle: Text(dados['senderNamer']),
-                trailing: Text(DateFormat('kk:mm').format(dados['time'].toDate())),
+    final Map<String, dynamic> infoMsg = dadosMensagem['mensagem'];
+    final bool mine = dadosMensagem['sender']['uid'] == usuarioUid;
+    final bool related = dadosMensagem['reciver']['uid'] == usuarioUid && dadosMensagem['sender']['uid'] == contato['uid'] || mine && dadosMensagem['reciver']['uid'] == contato['uid'];
+    if (related == true) {
+      return Row(
+        children: [
+          !mine ?
+          CircleAvatar(
+            foregroundImage: NetworkImage(dadosMensagem['sender']['senderPhoto'], scale: 1),
+          ) : Container(),
+          SizedBox(width: 10),
+          Expanded(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(2.0),
+                child: ListTile(
+                  title: infoMsg['imageUrl'] != null ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Image.network(infoMsg['imageUrl']),
+                  ) : Text(infoMsg['text']),
+                  subtitle: Text(dadosMensagem['sender']['name']),
+                  trailing: Text(
+                      DateFormat('kk:mm').format(infoMsg['time'].toDate())),
+                ),
               ),
             ),
           ),
-        ),
-        SizedBox(width: 10,),
-        mine ?
-        CircleAvatar(
-          foregroundImage: NetworkImage(dados['senderPhoto'], scale: 1),
-        ) : Container(),
-      ],
-    );
+          SizedBox(width: 10,),
+          mine ?
+          CircleAvatar(
+            foregroundImage: NetworkImage(dadosMensagem['sender']['senderPhoto'], scale: 1),
+          ) : Container(),
+        ],
+      );
+    } else{
+      return Container();
+    }
   }
 }

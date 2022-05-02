@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:chat/screens/login_screen.dart';
 import 'package:chat/widgets/card_message.dart';
 import 'package:chat/widgets/text_composer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,7 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({Key? key}) : super(key: key);
+  final Map<String, dynamic> contato;
+
+  ChatScreen(this.contato);
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -17,6 +20,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   User? _currentUser;
+  final GoogleSignIn googleSignIn = GoogleSignIn();
 
   @override
   void initState() {
@@ -27,49 +31,26 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  final GoogleSignIn googleSignIn = GoogleSignIn();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  Future<User?> _getUser() async {
-    if (_currentUser != null) return _currentUser;
-    try {
-      final GoogleSignInAccount? googleSignInAccount =
-          await googleSignIn.signIn();
-      final GoogleSignInAuthentication? googleSignInAuthentication =
-          await googleSignInAccount!.authentication;
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        idToken: googleSignInAuthentication!.idToken,
-        accessToken: googleSignInAuthentication.accessToken,
-      );
-      final UserCredential authResult =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-
-      final User? user = authResult.user;
-
-      Map <String, dynamic> usuario = {
-        'nome' : user!.displayName,
-        'email' : user.email,
-        'foto' : user.photoURL,
-        'uid' : user.uid,
-      };
-
-      FirebaseFirestore.instance.collection('usuarios').doc(user.uid).set(usuario);
-      return user;
-    } catch (error) {
-      print("deu ruim doidão $error");
-      return null;
-    }
-  }
-
   void _sendMessage({String? text, File? imgFile}) async {
-    final User? user = await _getUser();
+    final User? user = _currentUser;
 
-    Map<String, dynamic> data = {
-      'uid': user!.uid,
-      'senderNamer': user.displayName,
-      'senderPhoto': user.photoURL,
+    Map<String, dynamic> mensagem = {
       'time': DateTime.now().toLocal(),
-      'hour': Timestamp.now()
+    };
+
+    Map<String, dynamic> sender = {
+      'name': user!.displayName,
+      'uid': user.uid,
+      'senderPhoto': user.photoURL,
+    };
+
+    Map<String, dynamic> dataMessage = {
+      'mensagem': mensagem,
+      'sender': sender,
+      'reciver': widget.contato,
+      'hour': Timestamp.now(),
     };
 
     if (imgFile != null) {
@@ -78,12 +59,12 @@ class _ChatScreenState extends State<ChatScreen> {
           .child(user.uid + DateTime.now().millisecondsSinceEpoch.toString())
           .putFile(imgFile);
       String url = await task.ref.getDownloadURL();
-      data['imageUrl'] = url;
+      mensagem['imageUrl'] = url;
     }
 
-    if (text != null) data['text'] = text;
+    if (text != null) mensagem['text'] = text;
 
-    FirebaseFirestore.instance.collection('messages').add(data);
+    FirebaseFirestore.instance.collection('menssagens').add(dataMessage);
   }
 
   @override
@@ -92,41 +73,42 @@ class _ChatScreenState extends State<ChatScreen> {
       key: _scaffoldKey,
       appBar: AppBar(
         title: Text(
-          _currentUser != null ? 'Olá, ${_currentUser!.displayName}' : 'Chat',
+          _currentUser != null ? '${widget.contato['nome']}' : 'Chat',
         ),
         actions: [
-          _currentUser == null
-              ? IconButton(
-                  onPressed: () {
-                    _getUser();
-                  },
-                  icon: Icon(Icons.login))
-              : IconButton(
-                  onPressed: () {
-                    showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                              title: Text("Sair"),
-                              content: Text("Você deseja mesmo sair?"),
-                              actions: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                  child: Text("Não"),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    FirebaseAuth.instance.signOut();
-                                    googleSignIn.signOut();
-                                    Navigator.pop(context);
-                                  },
-                                  child: Text("Sair"),
-                                ),
-                              ],
-                            ));
-                  },
-                  icon: Icon(Icons.logout)),
+          IconButton(
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text("Sair"),
+                  content: Text("Você deseja mesmo sair?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: Text("Não"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        FirebaseAuth.instance.signOut();
+                        googleSignIn.signOut();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LoginScreen(),
+                          ),
+                        );
+                      },
+                      child: Text("Sair"),
+                    ),
+                  ],
+                ),
+              );
+            },
+            icon: Icon(Icons.logout),
+          ),
         ],
       ),
       body: Column(
@@ -134,7 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('messages')
+                  .collection('menssagens')
                   .orderBy('hour')
                   .snapshots(),
               builder: (context, snapshot) {
@@ -145,8 +127,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     );
                   default:
                     try {
-                      List<DocumentSnapshot> documents =
-                          snapshot.data!.docs.reversed.toList();
+                      List<DocumentSnapshot> documents = snapshot.data!.docs.reversed.toList();
                       return ListView.builder(
                         physics: BouncingScrollPhysics(),
                         reverse: true,
@@ -156,22 +137,15 @@ class _ChatScreenState extends State<ChatScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 2),
                             child: ChatMessage(
-                                documents[index].data() as Map<String, dynamic>,
-                                _currentUser == null ? '' : _currentUser!.uid),
+                              documents[index].data() as Map<String, dynamic>,
+                              _currentUser == null ? '' : _currentUser!.uid,
+                              widget.contato,
+                            ),
                           );
                         },
                       );
-                    } catch (error) {
-                    }
-                    return Center(
-                      child: AlertDialog(
-                        content: Text(
-                            "Você precisa estar logado para visualizar o chat"),
-                        actions: [
-                          TextButton(onPressed: _getUser, child: Text("Logar"))
-                        ],
-                      ),
-                    );
+                    } catch (error) {}
+                    return Text('data');
                 }
               },
             ),
